@@ -108,6 +108,7 @@ tr:hover{background:#f8f9fa}
       <li id="menu-sales" onclick="showSection('sales')"><span>💳</span> Sales</li>
       <li id="menu-expenses" onclick="showSection('expenses')"><span>💰</span> Expenses</li>
       <li id="menu-analytics" onclick="showSection('analytics')"><span>📈</span> Analytics</li>
+      <li id="menu-customers" onclick="showSection('customers')"><span>👥</span> Customers</li>
       <li id="menu-settings" onclick="showSection('settings')"><span>⚙️</span> Settings</li>
     </ul>
     <button class="logout-btn" onclick="doLogout()">🚪 Logout</button>
@@ -202,6 +203,18 @@ tr:hover{background:#f8f9fa}
       </div>
     </div>
 
+    <!-- CUSTOMERS -->
+    <div id="section-customers" class="section hidden">
+      <div class="card">
+        <div class="card-header"><h2>Customer Management</h2><button class="btn btn-primary" onclick="openCustomerModal()">+ Add Customer</button></div>
+        <div style="display:flex;gap:12px;margin-bottom:20px">
+          <div class="form-group" style="flex:1"><label>Search</label><input type="text" id="customerSearch" placeholder="Search by name or mobile" onkeyup="searchCustomers()"></div>
+          <div style="display:flex;align-items:flex-end"><button class="btn btn-warning" onclick="loadCustomers()">Refresh</button></div>
+        </div>
+        <div id="customersTable"></div>
+      </div>
+    </div>
+
     <!-- SETTINGS -->
     <div id="section-settings" class="section hidden">
       <div class="card">
@@ -244,6 +257,21 @@ tr:hover{background:#f8f9fa}
     <div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveProduct()">Save Product</button></div>
   </div>
 
+  <!-- CUSTOMER MODAL -->
+  <div id="customerModal" class="modal hidden">
+    <h2 id="customerModalTitle">Add Customer</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Name *</label><input type="text" id="custName" placeholder="e.g., Rajesh Kumar"></div>
+      <div class="form-group"><label>Mobile *</label><input type="tel" id="custMobile" placeholder="e.g., 9876543210"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="custEmail" placeholder="e.g., rajesh@email.com"></div>
+      <div class="form-group"><label>Address</label><input type="text" id="custAddress" placeholder="e.g., 123 Main Street"></div>
+      <div class="form-group"><label>City</label><input type="text" id="custCity" placeholder="e.g., Mumbai"></div>
+      <div class="form-group"><label>State</label><input type="text" id="custState" placeholder="e.g., Maharashtra"></div>
+      <div class="form-group"><label>Pincode</label><input type="text" id="custPincode" placeholder="e.g., 400001"></div>
+    </div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveCustomer()">Save Customer</button></div>
+  </div>
+
   <!-- EXPENSE MODAL -->
   <div id="expenseModal" class="modal hidden">
     <h2 id="expenseModalTitle">Add Expense</h2>
@@ -256,8 +284,6 @@ tr:hover{background:#f8f9fa}
     <div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveExpense()">Save Expense</button></div>
   </div>
 </div>
-
-<div id="printContainer" class="hidden"></div>
 
 <script>
 const API = '';
@@ -325,7 +351,6 @@ async function initApp() {
   await loadSettings();
   await loadProducts();
   renderDashboard();
-  document.getElementById('productStartDate').value = new Date().toISOString().split('T')[0];
 }
 
 async function loadSettings() {
@@ -354,33 +379,48 @@ function showSection(id) {
   if (id === 'sales') renderSales();
   if (id === 'expenses') renderExpenses();
   if (id === 'analytics') renderAnalytics();
+  if (id === 'customers') loadCustomers();
   if (id === 'settings') renderSettings();
 }
 
 async function renderDashboard() {
   try {
     const res = await fetch(`${API}/api/dashboard/stats`, {headers:getAuth()});
+    if (!res.ok) throw new Error('Failed to load stats');
     const data = await res.json();
-    document.getElementById('statProducts').textContent = data.totalProducts;
-    document.getElementById('statLowStock').textContent = data.lowStock;
-    document.getElementById('statSales').textContent = data.todaySales;
+    if (data.error) throw new Error(data.error);
+    document.getElementById('statProducts').textContent = data.totalProducts || 0;
+    document.getElementById('statLowStock').textContent = data.lowStock || 0;
+    document.getElementById('statSales').textContent = data.todaySales || 0;
     document.getElementById('statRevenue').textContent = 'Rs' + parseFloat(data.todayRevenue || 0).toFixed(2);
     
     const salesRes = await fetch(`${API}/api/dashboard/recent-sales`, {headers:getAuth()});
+    if (!salesRes.ok) throw new Error('Failed to load recent sales');
     const sales = await salesRes.json();
+    if (sales.error) throw new Error(sales.error);
+    
     let html = '<table><thead><tr><th>Date</th><th>Items</th><th>Total</th><th>Cashier</th></tr></thead><tbody>';
-    sales.forEach(s => {
-      html += `<tr><td>${s.sale_date}</td><td>${s.total_items}</td><td>Rs${parseFloat(s.total_amount || 0).toFixed(2)}</td><td>${s.cashier_name || 'N/A'}</td></tr>`;
-    });
+    if (Array.isArray(sales) && sales.length > 0) {
+      sales.forEach(s => {
+        html += `<tr><td>${s.sale_date || 'N/A'}</td><td>${s.total_items || 0}</td><td>Rs${parseFloat(s.total_amount || 0).toFixed(2)}</td><td>${s.cashier_name || 'N/A'}</td></tr>`;
+      });
+    } else {
+      html += '<tr><td colspan="4" style="text-align:center;color:#999">No sales data yet</td></tr>';
+    }
     html += '</tbody></table>';
     document.getElementById('dashboardSales').innerHTML = html;
-  } catch(err) { showToast(err.message, 'error'); }
+  } catch(err) { 
+    console.error('Dashboard error:', err);
+    showToast(err.message || 'Error loading dashboard', 'error'); 
+  }
 }
 
 async function loadProducts() {
   try {
     const res = await fetch(`${API}/api/products`, {headers:getAuth()});
+    if (!res.ok) throw new Error('Failed to load products');
     allProducts = await res.json();
+    if (allProducts.error) throw new Error(allProducts.error);
     const catSet = new Set(allProducts.map(p => p.category).filter(Boolean));
     let catHtml = '<option value="">All Categories</option>';
     catSet.forEach(cat => catHtml += `<option value="${cat}">${cat}</option>`);
@@ -464,16 +504,26 @@ async function loadSales() {
     if (startDate && endDate) url += `?startDate=${startDate}&endDate=${endDate}`;
     
     const res = await fetch(url, {headers:getAuth()});
-    allSales = await res.json();
+    if (!res.ok) throw new Error('Failed to load sales');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    allSales = Array.isArray(data) ? data : [];
     renderSales();
-  } catch(err) { showToast(err.message, 'error'); }
+  } catch(err) { 
+    console.error('Sales load error:', err);
+    showToast(err.message, 'error'); 
+  }
 }
 
 function renderSales() {
   let html = '<table><thead><tr><th>Date</th><th>Items</th><th>Total</th><th>Payment</th><th>Cashier</th></tr></thead><tbody>';
-  allSales.forEach(s => {
-    html += `<tr><td>${s.sale_date}</td><td>${s.total_items}</td><td>Rs${parseFloat(s.total_amount || 0).toFixed(2)}</td><td>${s.payment_method || '-'}</td><td>${s.cashier_name || 'N/A'}</td></tr>`;
-  });
+  if (Array.isArray(allSales) && allSales.length > 0) {
+    allSales.forEach(s => {
+      html += `<tr><td>${s.sale_date || 'N/A'}</td><td>${s.total_items || 0}</td><td>Rs${parseFloat(s.total_amount || 0).toFixed(2)}</td><td>${s.payment_method || '-'}</td><td>${s.cashier_name || 'N/A'}</td></tr>`;
+    });
+  } else {
+    html += '<tr><td colspan="5" style="text-align:center;color:#999">No sales data</td></tr>';
+  }
   html += '</tbody></table>';
   document.getElementById('salesTable').innerHTML = html;
 }
@@ -520,12 +570,18 @@ async function loadExpenses() {
     if (startDate && endDate) url += `?startDate=${startDate}&endDate=${endDate}`;
     
     const res = await fetch(url, {headers:getAuth()});
+    if (!res.ok) throw new Error('Failed to load expenses');
     const expenses = await res.json();
+    if (expenses.error) throw new Error(expenses.error);
     
     let html = '<table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead><tbody>';
-    expenses.forEach(exp => {
-      html += `<tr><td>${exp.expense_date}</td><td>${exp.category}</td><td>${exp.description || '-'}</td><td>Rs${parseFloat(exp.amount).toFixed(2)}</td></tr>`;
-    });
+    if (Array.isArray(expenses) && expenses.length > 0) {
+      expenses.forEach(exp => {
+        html += `<tr><td>${exp.expense_date || 'N/A'}</td><td>${exp.category || 'N/A'}</td><td>${exp.description || '-'}</td><td>Rs${parseFloat(exp.amount || 0).toFixed(2)}</td></tr>`;
+      });
+    } else {
+      html += '<tr><td colspan="4" style="text-align:center;color:#999">No expenses found</td></tr>';
+    }
     html += '</tbody></table>';
     document.getElementById('expensesTable').innerHTML = html;
     
@@ -537,7 +593,10 @@ async function loadExpenses() {
       <div class="stat-card"><h3>Average</h3><div class="value">Rs${parseFloat(summary.average_expense || 0).toFixed(2)}</div></div>
     `;
     document.getElementById('expensesSummary').innerHTML = summaryHtml;
-  } catch(err) { showToast(err.message, 'error'); }
+  } catch(err) { 
+    console.error('Expenses load error:', err);
+    showToast(err.message, 'error'); 
+  }
 }
 
 async function loadAnalytics() {
@@ -548,34 +607,53 @@ async function loadAnalytics() {
     if (startDate && endDate) url += `?startDate=${startDate}&endDate=${endDate}`;
     
     const res = await fetch(url, {headers:getAuth()});
+    if (!res.ok) throw new Error('Failed to load analytics');
     const data = await res.json();
+    if (data.error) throw new Error(data.error);
     if (!Array.isArray(data)) throw new Error('Invalid data format');
     
     let html = '<table><thead><tr><th>Date</th><th>Sales</th><th>Revenue</th><th>Cashiers</th></tr></thead><tbody>';
-    data.forEach(row => {
-      html += `<tr><td>${row.date}</td><td>${row.total_sales}</td><td>Rs${parseFloat(row.total_revenue || 0).toFixed(2)}</td><td>${row.cashiers}</td></tr>`;
-    });
+    if (data.length > 0) {
+      data.forEach(row => {
+        html += `<tr><td>${row.date || 'N/A'}</td><td>${row.total_sales || 0}</td><td>Rs${parseFloat(row.total_revenue || 0).toFixed(2)}</td><td>${row.cashiers || 0}</td></tr>`;
+      });
+    } else {
+      html += '<tr><td colspan="4" style="text-align:center;color:#999">No data available</td></tr>';
+    }
     html += '</tbody></table>';
     document.getElementById('analyticsTable').innerHTML = html;
     
     const topRes = await fetch(`${API}/api/analytics/top-products?limit=10`, {headers:getAuth()});
+    if (!topRes.ok) throw new Error('Failed to load top products');
     const topProducts = await topRes.json();
     let topHtml = '<table><thead><tr><th>Product</th><th>Sold</th><th>Revenue</th></tr></thead><tbody>';
-    topProducts.forEach(p => {
-      topHtml += `<tr><td>${p.name}</td><td>${p.total_sold || 0}</td><td>Rs${parseFloat(p.total_revenue || 0).toFixed(2)}</td></tr>`;
-    });
+    if (Array.isArray(topProducts) && topProducts.length > 0) {
+      topProducts.forEach(p => {
+        topHtml += `<tr><td>${p.name || 'N/A'}</td><td>${p.total_sold || 0}</td><td>Rs${parseFloat(p.total_revenue || 0).toFixed(2)}</td></tr>`;
+      });
+    } else {
+      topHtml += '<tr><td colspan="3" style="text-align:center;color:#999">No data available</td></tr>';
+    }
     topHtml += '</tbody></table>';
     document.getElementById('topProductsTable').innerHTML = topHtml;
     
     const catRes = await fetch(`${API}/api/analytics/category-sales`, {headers:getAuth()});
+    if (!catRes.ok) throw new Error('Failed to load category sales');
     const categories = await catRes.json();
     let catHtml = '<table><thead><tr><th>Category</th><th>Sales</th><th>Quantity</th><th>Revenue</th></tr></thead><tbody>';
-    categories.forEach(c => {
-      catHtml += `<tr><td>${c.category || 'N/A'}</td><td>${c.sales_count || 0}</td><td>${c.total_quantity || 0}</td><td>Rs${parseFloat(c.total_revenue || 0).toFixed(2)}</td></tr>`;
-    });
+    if (Array.isArray(categories) && categories.length > 0) {
+      categories.forEach(c => {
+        catHtml += `<tr><td>${c.category || 'N/A'}</td><td>${c.sales_count || 0}</td><td>${c.total_quantity || 0}</td><td>Rs${parseFloat(c.total_revenue || 0).toFixed(2)}</td></tr>`;
+      });
+    } else {
+      catHtml += '<tr><td colspan="4" style="text-align:center;color:#999">No data available</td></tr>';
+    }
     catHtml += '</tbody></table>';
     document.getElementById('categorySalesTable').innerHTML = catHtml;
-  } catch(err) { showToast(err.message, 'error'); }
+  } catch(err) { 
+    console.error('Analytics error:', err);
+    showToast(err.message, 'error'); 
+  }
 }
 
 async function renderSettings() {
@@ -586,12 +664,17 @@ async function renderSettings() {
     document.getElementById('settingAddress').value = settings.shop_address || '';
     
     const res = await fetch(`${API}/api/backup/list`, {headers:getAuth()});
+    if (!res.ok) throw new Error('Failed to load backups');
     const backups = await res.json();
     let html = '<table><thead><tr><th>Filename</th><th>Size</th><th>Date</th><th>Action</th></tr></thead><tbody>';
-    backups.forEach(b => {
-      const size = (b.size / 1024).toFixed(2);
-      html += `<tr><td>${b.name}</td><td>${size} KB</td><td>${new Date(b.date).toLocaleString()}</td><td><a href="${API}/api/backup/download/${b.name}" class="btn btn-sm btn-primary">Download</a></td></tr>`;
-    });
+    if (Array.isArray(backups) && backups.length > 0) {
+      backups.forEach(b => {
+        const size = (b.size / 1024).toFixed(2);
+        html += `<tr><td>${b.name}</td><td>${size} KB</td><td>${new Date(b.date).toLocaleString()}</td><td><a href="${API}/api/backup/download/${b.name}" class="btn btn-sm btn-primary">Download</a></td></tr>`;
+      });
+    } else {
+      html += '<tr><td colspan="4" style="text-align:center;color:#999">No backups yet</td></tr>';
+    }
     html += '</tbody></table>';
     document.getElementById('backupsList').innerHTML = html;
   } catch(err) { console.error('Settings render failed', err); }
@@ -630,6 +713,142 @@ async function showLowStockItems() {
     items.forEach(item => msg += `- ${item.name}: ${item.quantity} (min: ${item.min_stock_level})\n`);
     alert(msg);
   } catch(err) { showToast(err.message, 'error'); }
+}
+
+function renderAnalytics() {
+  // This is called from showSection, actual loading is done by loadAnalytics
+}
+
+function renderExpenses() {
+  // This is called from showSection, actual loading is done by loadExpenses
+}
+
+let allCustomers = [];
+
+async function loadCustomers() {
+  try {
+    const res = await fetch(`${API}/api/customers`, {headers:getAuth()});
+    if (!res.ok) throw new Error('Failed to load customers');
+    allCustomers = await res.json();
+    if (allCustomers.error) throw new Error(allCustomers.error);
+    renderCustomers();
+  } catch(err) { 
+    console.error('Customers load error:', err);
+    showToast(err.message, 'error'); 
+  }
+}
+
+function renderCustomers() {
+  let html = '<table><thead><tr><th>Name</th><th>Mobile</th><th>Email</th><th>City</th><th>Actions</th></tr></thead><tbody>';
+  if (Array.isArray(allCustomers) && allCustomers.length > 0) {
+    allCustomers.forEach(c => {
+      html += `<tr><td>${c.name}</td><td>${c.mobile}</td><td>${c.email || '-'}</td><td>${c.city || '-'}</td><td><button class="btn btn-sm btn-warning" onclick="editCustomer(${c.id})">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${c.id})">Delete</button></td></tr>`;
+    });
+  } else {
+    html += '<tr><td colspan="5" style="text-align:center;color:#999">No customers found</td></tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('customersTable').innerHTML = html;
+}
+
+function openCustomerModal() {
+  document.getElementById('customerModalTitle').textContent = 'Add Customer';
+  document.getElementById('custName').value = '';
+  document.getElementById('custMobile').value = '';
+  document.getElementById('custEmail').value = '';
+  document.getElementById('custAddress').value = '';
+  document.getElementById('custCity').value = '';
+  document.getElementById('custState').value = '';
+  document.getElementById('custPincode').value = '';
+  document.getElementById('modalOverlay').classList.remove('hidden');
+  document.getElementById('customerModal').classList.remove('hidden');
+}
+
+async function saveCustomer() {
+  try {
+    const name = document.getElementById('custName').value.trim();
+    const mobile = document.getElementById('custMobile').value.trim();
+    
+    if (!name || !mobile) {
+      showToast('Please fill required fields', 'error');
+      return;
+    }
+    
+    const payload = {
+      name,
+      mobile,
+      email: document.getElementById('custEmail').value || null,
+      address: document.getElementById('custAddress').value || null,
+      city: document.getElementById('custCity').value || null,
+      state: document.getElementById('custState').value || null,
+      pincode: document.getElementById('custPincode').value || null
+    };
+    
+    const res = await fetch(`${API}/api/customers`, {
+      method: 'POST',
+      headers: getAuth(),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Customer saved!', 'success');
+    closeModal();
+    loadCustomers();
+  } catch(err) { showToast(err.message, 'error'); }
+}
+
+async function editCustomer(id) {
+  try {
+    const res = await fetch(`${API}/api/customers/${id}`, {headers:getAuth()});
+    const customer = await res.json();
+    if (customer.error) throw new Error(customer.error);
+    
+    document.getElementById('customerModalTitle').textContent = 'Edit Customer';
+    document.getElementById('custName').value = customer.name;
+    document.getElementById('custMobile').value = customer.mobile;
+    document.getElementById('custEmail').value = customer.email || '';
+    document.getElementById('custAddress').value = customer.address || '';
+    document.getElementById('custCity').value = customer.city || '';
+    document.getElementById('custState').value = customer.state || '';
+    document.getElementById('custPincode').value = customer.pincode || '';
+    
+    // Store ID for update
+    document.getElementById('custName').dataset.customerId = id;
+    
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    document.getElementById('customerModal').classList.remove('hidden');
+  } catch(err) { showToast(err.message, 'error'); }
+}
+
+async function deleteCustomer(id) {
+  if (!confirm('Are you sure you want to delete this customer?')) return;
+  try {
+    const res = await fetch(`${API}/api/customers/${id}`, {
+      method: 'DELETE',
+      headers: getAuth()
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Customer deleted!', 'success');
+    loadCustomers();
+  } catch(err) { showToast(err.message, 'error'); }
+}
+
+function searchCustomers() {
+  const query = document.getElementById('customerSearch').value.toLowerCase();
+  const filtered = allCustomers.filter(c => 
+    c.name.toLowerCase().includes(query) || c.mobile.includes(query)
+  );
+  let html = '<table><thead><tr><th>Name</th><th>Mobile</th><th>Email</th><th>City</th><th>Actions</th></tr></thead><tbody>';
+  if (filtered.length > 0) {
+    filtered.forEach(c => {
+      html += `<tr><td>${c.name}</td><td>${c.mobile}</td><td>${c.email || '-'}</td><td>${c.city || '-'}</td><td><button class="btn btn-sm btn-warning" onclick="editCustomer(${c.id})">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${c.id})">Delete</button></td></tr>`;
+    });
+  } else {
+    html += '<tr><td colspan="5" style="text-align:center;color:#999">No customers found</td></tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('customersTable').innerHTML = html;
 }
 
 function closeModal() {

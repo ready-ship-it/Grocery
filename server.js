@@ -21,6 +21,7 @@ app.use('/api/sales', authenticate, require('./routes/sales'));
 app.use('/api/expenses', authenticate, require('./routes/expenses'));
 app.use('/api/analytics', authenticate, require('./routes/analytics'));
 app.use('/api/users', authenticate, require('./routes/users'));
+app.use('/api/customers', authenticate, require('./routes/customers'));
 app.use('/api/settings', authenticate, require('./routes/settings'));
 app.use('/api/backup', authenticate, require('./routes/backup'));
 app.use('/api/dashboard', authenticate, require('./routes/dashboard'));
