@@ -18,6 +18,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', authenticate, require('./routes/products'));
 app.use('/api/sales', authenticate, require('./routes/sales'));
+app.use('/api/purchases', authenticate, require('./routes/purchases'));
 app.use('/api/expenses', authenticate, require('./routes/expenses'));
 app.use('/api/analytics', authenticate, require('./routes/analytics'));
 app.use('/api/users', authenticate, require('./routes/users'));

@@ -106,6 +106,7 @@ tr:hover{background:#f8f9fa}
       <li id="menu-dashboard" class="active" onclick="showSection('dashboard')"><span>📊</span> Dashboard</li>
       <li id="menu-products" onclick="showSection('products')"><span>📦</span> Products</li>
       <li id="menu-sales" onclick="showSection('sales')"><span>💳</span> Sales</li>
+      <li id="menu-purchases" onclick="showSection('purchases')"><span>📥</span> Purchases</li>
       <li id="menu-expenses" onclick="showSection('expenses')"><span>💰</span> Expenses</li>
       <li id="menu-analytics" onclick="showSection('analytics')"><span>📈</span> Analytics</li>
       <li id="menu-customers" onclick="showSection('customers')"><span>👥</span> Customers</li>
@@ -155,7 +156,7 @@ tr:hover{background:#f8f9fa}
     <!-- SALES -->
     <div id="section-sales" class="section hidden">
       <div class="card">
-        <div class="card-header"><h2>Sales History</h2></div>
+        <div class="card-header"><h2>Sales History</h2><button class="btn btn-primary" onclick="openSaleModal()">+ Add Sale</button></div>
         <div style="display:flex;gap:12px;margin-bottom:20px">
           <div class="form-group" style="flex:1"><label>Start Date</label><input type="date" id="salesStartDate"></div>
           <div class="form-group" style="flex:1"><label>End Date</label><input type="date" id="salesEndDate"></div>
@@ -179,6 +180,19 @@ tr:hover{background:#f8f9fa}
       <div class="card">
         <div class="card-header"><h2>Expense Summary</h2></div>
         <div id="expensesSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px"></div>
+      </div>
+    </div>
+
+    <!-- PURCHASES -->
+    <div id="section-purchases" class="section hidden">
+      <div class="card">
+        <div class="card-header"><h2>Stock Purchases</h2><button class="btn btn-primary" onclick="openPurchaseModal()">+ Add Purchase</button></div>
+        <div style="display:flex;gap:12px;margin-bottom:20px">
+          <div class="form-group" style="flex:1"><label>Start Date</label><input type="date" id="purchaseStartDate"></div>
+          <div class="form-group" style="flex:1"><label>End Date</label><input type="date" id="purchaseEndDate"></div>
+          <div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="loadPurchases()">Filter</button></div>
+        </div>
+        <div id="purchasesTable"></div>
       </div>
     </div>
 
@@ -283,6 +297,58 @@ tr:hover{background:#f8f9fa}
     </div>
     <div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveExpense()">Save Expense</button></div>
   </div>
+
+  <!-- SALE MODAL -->
+  <div id="saleModal" class="modal hidden">
+    <h2>Add Sale</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Search Customer (Mobile)</label><input type="text" id="saleCustomerSearch" placeholder="Enter mobile number" onkeyup="searchCustomerByMobile()"></div>
+      <div class="form-group"><label>Customer Name</label><input type="text" id="saleCustomerName" placeholder="Auto-filled or enter name"></div>
+      <div class="form-group"><label>Mobile</label><input type="text" id="saleCustomerMobile" placeholder="Auto-filled or enter mobile"></div>
+      <div class="form-group"><label>Address (Optional)</label><input type="text" id="saleCustomerAddress" placeholder="Auto-filled or enter address"></div>
+    </div>
+    <div style="margin:20px 0;border:1px solid #ddd;padding:15px;border-radius:8px">
+      <h3>Add Items</h3>
+      <div style="display:flex;gap:10px;margin-bottom:10px">
+        <select id="saleProductSelect" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:4px"><option value="">Select Product</option></select>
+        <input type="number" id="saleProductQty" placeholder="Qty" min="1" style="width:80px;padding:8px;border:1px solid #ccc;border-radius:4px">
+        <button class="btn btn-sm btn-success" onclick="addSaleItem()">Add Item</button>
+      </div>
+      <div id="saleItemsList" style="max-height:200px;overflow-y:auto"></div>
+    </div>
+    <div style="background:#f9f9f9;padding:15px;border-radius:8px;margin:15px 0">
+      <div style="display:flex;justify-content:space-between;margin:5px 0"><strong>Subtotal:</strong><span id="saleSubtotal">Rs 0.00</span></div>
+      <div style="display:flex;justify-content:space-between;margin:5px 0"><label>Discount (%):</label><input type="number" id="saleDiscount" min="0" max="100" value="0" style="width:80px" onchange="calculateSaleTotal()"></div>
+      <div style="display:flex;justify-content:space-between;margin:5px 0;font-size:18px;font-weight:bold;color:#2d5016"><strong>Total:</strong><span id="saleTotal">Rs 0.00</span></div>
+    </div>
+    <div class="form-group"><label>Payment Method</label><select id="salePaymentMethod"><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option><option value="cheque">Cheque</option></select></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="completeSale()">Complete Sale</button><button class="btn btn-info" onclick="printReceipt()" style="margin-left:10px">Print Receipt</button></div>
+  </div>
+
+  <!-- PURCHASE MODAL -->
+  <div id="purchaseModal" class="modal hidden">
+    <h2>Add Purchase</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Supplier Name *</label><input type="text" id="purSupplierName" placeholder="Supplier name"></div>
+      <div class="form-group"><label>Supplier Contact</label><input type="text" id="purSupplierContact" placeholder="Mobile/Phone"></div>
+      <div class="form-group"><label>Payment Status</label><select id="purPaymentStatus"><option value="pending">Pending</option><option value="paid">Paid</option><option value="partial">Partial</option></select></div>
+    </div>
+    <div style="margin:20px 0;border:1px solid #ddd;padding:15px;border-radius:8px">
+      <h3>Add Items</h3>
+      <div style="display:flex;gap:10px;margin-bottom:10px">
+        <select id="purProductSelect" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:4px"><option value="">Select Product</option></select>
+        <input type="number" id="purProductQty" placeholder="Qty" min="1" style="width:80px;padding:8px;border:1px solid #ccc;border-radius:4px">
+        <input type="number" id="purUnitCost" placeholder="Unit Cost" min="0" step="0.01" style="width:100px;padding:8px;border:1px solid #ccc;border-radius:4px">
+        <button class="btn btn-sm btn-success" onclick="addPurchaseItem()">Add Item</button>
+      </div>
+      <div id="purchaseItemsList" style="max-height:200px;overflow-y:auto"></div>
+    </div>
+    <div style="background:#f9f9f9;padding:15px;border-radius:8px;margin:15px 0">
+      <div style="display:flex;justify-content:space-between;margin:5px 0;font-size:18px;font-weight:bold;color:#2d5016"><strong>Total Amount:</strong><span id="purchaseTotal">Rs 0.00</span></div>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea id="purNotes" placeholder="Additional notes" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;min-height:60px"></textarea></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="savePurchase()">Save Purchase</button></div>
+  </div>
 </div>
 
 <script>
@@ -350,6 +416,7 @@ async function initApp() {
   
   await loadSettings();
   await loadProducts();
+  await loadCustomers();
   renderDashboard();
 }
 
@@ -887,6 +954,316 @@ function searchCustomers() {
   }
   html += '</tbody></table>';
   document.getElementById('customersTable').innerHTML = html;
+}
+
+let currentSaleItems = [];
+let currentPurchaseItems = [];
+let allCustomers = [];
+
+function openSaleModal() {
+  currentSaleItems = [];
+  document.getElementById('saleCustomerSearch').value = '';
+  document.getElementById('saleCustomerName').value = '';
+  document.getElementById('saleCustomerMobile').value = '';
+  document.getElementById('saleCustomerAddress').value = '';
+  document.getElementById('saleProductQty').value = '';
+  document.getElementById('saleDiscount').value = '0';
+  document.getElementById('saleItemsList').innerHTML = '';
+  document.getElementById('saleSubtotal').textContent = 'Rs 0.00';
+  document.getElementById('saleTotal').textContent = 'Rs 0.00';
+  
+  // Populate product select
+  let options = '<option value="">Select Product</option>';
+  allProducts.forEach(p => {
+    options += `<option value="${p.id}" data-price="${p.selling_price}" data-name="${p.name}">${p.name} - Rs${p.selling_price}</option>`;
+  });
+  document.getElementById('saleProductSelect').innerHTML = options;
+  
+  document.getElementById('modalOverlay').classList.remove('hidden');
+  document.getElementById('saleModal').classList.remove('hidden');
+}
+
+function searchCustomerByMobile() {
+  const mobile = document.getElementById('saleCustomerSearch').value;
+  if (mobile.length >= 10) {
+    const customer = allCustomers.find(c => c.mobile.includes(mobile));
+    if (customer) {
+      document.getElementById('saleCustomerName').value = customer.name;
+      document.getElementById('saleCustomerMobile').value = customer.mobile;
+      document.getElementById('saleCustomerAddress').value = customer.address || '';
+    }
+  }
+}
+
+function addSaleItem() {
+  const productSelect = document.getElementById('saleProductSelect');
+  const qty = parseInt(document.getElementById('saleProductQty').value);
+  const productId = productSelect.value;
+  
+  if (!productId || !qty || qty <= 0) {
+    showToast('Please select product and enter quantity', 'error');
+    return;
+  }
+  
+  const option = productSelect.options[productSelect.selectedIndex];
+  const price = parseFloat(option.dataset.price);
+  const name = option.dataset.name;
+  
+  currentSaleItems.push({ product_id: productId, name, quantity: qty, unit_price: price, total_price: qty * price });
+  
+  document.getElementById('saleProductQty').value = '';
+  productSelect.value = '';
+  renderSaleItems();
+  calculateSaleTotal();
+}
+
+function removeSaleItem(index) {
+  currentSaleItems.splice(index, 1);
+  renderSaleItems();
+  calculateSaleTotal();
+}
+
+function renderSaleItems() {
+  let html = '<table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:1px solid #ddd"><th>Product</th><th>Qty</th><th>Price</th><th>Total</th><th></th></tr></thead><tbody>';
+  currentSaleItems.forEach((item, idx) => {
+    html += `<tr style="border-bottom:1px solid #eee"><td>${item.name}</td><td>${item.quantity}</td><td>Rs${item.unit_price.toFixed(2)}</td><td>Rs${item.total_price.toFixed(2)}</td><td><button class="btn btn-sm btn-danger" onclick="removeSaleItem(${idx})">Remove</button></td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('saleItemsList').innerHTML = html;
+}
+
+function calculateSaleTotal() {
+  const subtotal = currentSaleItems.reduce((sum, item) => sum + item.total_price, 0);
+  const discount = (parseFloat(document.getElementById('saleDiscount').value) || 0) / 100;
+  const total = subtotal * (1 - discount);
+  
+  document.getElementById('saleSubtotal').textContent = `Rs ${subtotal.toFixed(2)}`;
+  document.getElementById('saleTotal').textContent = `Rs ${total.toFixed(2)}`;
+}
+
+async function completeSale() {
+  if (currentSaleItems.length === 0) {
+    showToast('Please add at least one item', 'error');
+    return;
+  }
+  
+  try {
+    const subtotal = currentSaleItems.reduce((sum, item) => sum + item.total_price, 0);
+    const discount = (parseFloat(document.getElementById('saleDiscount').value) || 0) / 100;
+    const total = subtotal * (1 - discount);
+    
+    const payload = {
+      customer_name: document.getElementById('saleCustomerName').value || 'Walk-in Customer',
+      customer_mobile: document.getElementById('saleCustomerMobile').value || '',
+      customer_address: document.getElementById('saleCustomerAddress').value || '',
+      items: currentSaleItems,
+      total_amount: total,
+      payment_method: document.getElementById('salePaymentMethod').value,
+      discount_percent: parseFloat(document.getElementById('saleDiscount').value) || 0
+    };
+    
+    const res = await fetch(`${API}/api/sales`, {
+      method: 'POST',
+      headers: getAuth(),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    
+    showToast('Sale completed successfully!', 'success');
+    closeModal();
+    loadSales();
+  } catch(err) { showToast(err.message, 'error'); }
+}
+
+function printReceipt() {
+  const subtotal = currentSaleItems.reduce((sum, item) => sum + item.total_price, 0);
+  const discount = (parseFloat(document.getElementById('saleDiscount').value) || 0) / 100;
+  const total = subtotal * (1 - discount);
+  
+  let receipt = `
+    <html>
+    <head><title>Receipt</title></head>
+    <body style="font-family:Arial;font-size:12px;max-width:400px;margin:0 auto;padding:20px">
+      <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px">
+        <h2>Fresh Grocery Store</h2>
+        <p>Receipt</p>
+      </div>
+      <div style="margin:15px 0">
+        <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+        <p><strong>Customer:</strong> ${document.getElementById('saleCustomerName').value || 'Walk-in'}</p>
+        <p><strong>Mobile:</strong> ${document.getElementById('saleCustomerMobile').value || '-'}</p>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin:15px 0">
+        <thead><tr style="border-bottom:1px solid #000"><th style="text-align:left">Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead>
+        <tbody>
+  `;
+  
+  currentSaleItems.forEach(item => {
+    receipt += `<tr><td>${item.name}</td><td style="text-align:right">${item.quantity}</td><td style="text-align:right">Rs${item.unit_price.toFixed(2)}</td><td style="text-align:right">Rs${item.total_price.toFixed(2)}</td></tr>`;
+  });
+  
+  receipt += `
+        </tbody>
+      </table>
+      <div style="border-top:1px solid #000;border-bottom:2px solid #000;padding:10px 0;margin:15px 0">
+        <p style="display:flex;justify-content:space-between"><strong>Subtotal:</strong><strong>Rs ${subtotal.toFixed(2)}</strong></p>
+        ${discount > 0 ? `<p style="display:flex;justify-content:space-between"><strong>Discount (${(discount*100).toFixed(0)}%):</strong><strong>-Rs ${(subtotal * discount).toFixed(2)}</strong></p>` : ''}
+        <p style="display:flex;justify-content:space-between;font-size:14px;font-weight:bold"><strong>TOTAL:</strong><strong>Rs ${total.toFixed(2)}</strong></p>
+      </div>
+      <p style="text-align:center;margin-top:20px"><strong>Payment Method:</strong> ${document.getElementById('salePaymentMethod').value}</p>
+      <p style="text-align:center;margin-top:20px;font-size:10px;color:#666">Thank you for your purchase!</p>
+    </body>
+    </html>
+  `;
+  
+  const printWindow = window.open('', '', 'width=500,height=600');
+  printWindow.document.write(receipt);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+function openPurchaseModal() {
+  currentPurchaseItems = [];
+  document.getElementById('purSupplierName').value = '';
+  document.getElementById('purSupplierContact').value = '';
+  document.getElementById('purProductQty').value = '';
+  document.getElementById('purUnitCost').value = '';
+  document.getElementById('purNotes').value = '';
+  document.getElementById('purchaseItemsList').innerHTML = '';
+  document.getElementById('purchaseTotal').textContent = 'Rs 0.00';
+  
+  // Populate product select
+  let options = '<option value="">Select Product</option>';
+  allProducts.forEach(p => {
+    options += `<option value="${p.id}" data-cost="${p.cost_price}" data-name="${p.name}">${p.name}</option>`;
+  });
+  document.getElementById('purProductSelect').innerHTML = options;
+  
+  document.getElementById('modalOverlay').classList.remove('hidden');
+  document.getElementById('purchaseModal').classList.remove('hidden');
+}
+
+function addPurchaseItem() {
+  const productSelect = document.getElementById('purProductSelect');
+  const qty = parseInt(document.getElementById('purProductQty').value);
+  const unitCost = parseFloat(document.getElementById('purUnitCost').value);
+  const productId = productSelect.value;
+  
+  if (!productId || !qty || qty <= 0 || !unitCost || unitCost <= 0) {
+    showToast('Please fill all fields correctly', 'error');
+    return;
+  }
+  
+  const option = productSelect.options[productSelect.selectedIndex];
+  const name = option.dataset.name;
+  
+  currentPurchaseItems.push({ product_id: productId, name, quantity: qty, unit_cost: unitCost, total_cost: qty * unitCost });
+  
+  document.getElementById('purProductQty').value = '';
+  document.getElementById('purUnitCost').value = '';
+  productSelect.value = '';
+  renderPurchaseItems();
+  calculatePurchaseTotal();
+}
+
+function removePurchaseItem(index) {
+  currentPurchaseItems.splice(index, 1);
+  renderPurchaseItems();
+  calculatePurchaseTotal();
+}
+
+function renderPurchaseItems() {
+  let html = '<table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:1px solid #ddd"><th>Product</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th></th></tr></thead><tbody>';
+  currentPurchaseItems.forEach((item, idx) => {
+    html += `<tr style="border-bottom:1px solid #eee"><td>${item.name}</td><td>${item.quantity}</td><td>Rs${item.unit_cost.toFixed(2)}</td><td>Rs${item.total_cost.toFixed(2)}</td><td><button class="btn btn-sm btn-danger" onclick="removePurchaseItem(${idx})">Remove</button></td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('purchaseItemsList').innerHTML = html;
+}
+
+function calculatePurchaseTotal() {
+  const total = currentPurchaseItems.reduce((sum, item) => sum + item.total_cost, 0);
+  document.getElementById('purchaseTotal').textContent = `Rs ${total.toFixed(2)}`;
+}
+
+async function savePurchase() {
+  if (currentPurchaseItems.length === 0) {
+    showToast('Please add at least one item', 'error');
+    return;
+  }
+  
+  const supplierName = document.getElementById('purSupplierName').value.trim();
+  if (!supplierName) {
+    showToast('Please enter supplier name', 'error');
+    return;
+  }
+  
+  try {
+    const total = currentPurchaseItems.reduce((sum, item) => sum + item.total_cost, 0);
+    
+    const payload = {
+      supplier_name: supplierName,
+      supplier_contact: document.getElementById('purSupplierContact').value || '',
+      items: currentPurchaseItems,
+      total_amount: total,
+      payment_status: document.getElementById('purPaymentStatus').value,
+      notes: document.getElementById('purNotes').value || ''
+    };
+    
+    const res = await fetch(`${API}/api/purchases`, {
+      method: 'POST',
+      headers: getAuth(),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    
+    showToast('Purchase saved successfully!', 'success');
+    closeModal();
+    loadPurchases();
+  } catch(err) { showToast(err.message, 'error'); }
+}
+
+async function loadPurchases() {
+  try {
+    const startDate = document.getElementById('purchaseStartDate')?.value;
+    const endDate = document.getElementById('purchaseEndDate')?.value;
+    let url = `${API}/api/purchases`;
+    if (startDate && endDate) url += `?startDate=${startDate}&endDate=${endDate}`;
+    
+    const res = await fetch(url, {headers:getAuth()});
+    if (!res.ok) throw new Error('Failed to load purchases');
+    const data = await res.json();
+    if (Array.isArray(data)) renderPurchases(data);
+  } catch(err) { showToast(err.message, 'error'); }
+}
+
+function renderPurchases(purchases) {
+  let html = '<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+  if (purchases.length > 0) {
+    purchases.forEach(p => {
+      html += `<tr><td>${p.purchase_date}</td><td>${p.supplier_name}</td><td>${p.total_items}</td><td>Rs${parseFloat(p.total_amount).toFixed(2)}</td><td><span style="padding:4px 8px;border-radius:4px;background:${p.payment_status === 'paid' ? '#27ae60' : '#f39c12'};color:white;font-size:12px">${p.payment_status}</span></td><td><button class="btn btn-sm btn-info" onclick="viewPurchase(${p.id})">View</button> <button class="btn btn-sm btn-danger" onclick="deletePurchase(${p.id})">Delete</button></td></tr>`;
+    });
+  } else {
+    html += '<tr><td colspan="6" style="text-align:center;color:#999">No purchases found</td></tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('purchasesTable').innerHTML = html;
+}
+
+async function deletePurchase(id) {
+  if (!confirm('Are you sure?')) return;
+  try {
+    const res = await fetch(`${API}/api/purchases/${id}`, {
+      method: 'DELETE',
+      headers: getAuth()
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Purchase deleted!', 'success');
+    loadPurchases();
+  } catch(err) { showToast(err.message, 'error'); }
 }
 
 function closeModal() {
